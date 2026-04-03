@@ -37,7 +37,7 @@ const getRefreshExpiryFromToken = (token: string): Date => {
 const storeRefreshToken = async (
   userId: number,
   jti: string,
-  rawToken: string
+  rawToken: string,
 ) => {
   const tokenHash = await bcrypt.hash(rawToken, config.bcryptSaltRounds);
   const expiresAt = getRefreshExpiryFromToken(rawToken);
@@ -142,7 +142,10 @@ const refresh = async (refreshToken: string) => {
     throw new Error("Refresh token reuse detected. Please log in again.");
   }
 
-  const tokenMatches = await bcrypt.compare(refreshToken, storedToken.tokenHash);
+  const tokenMatches = await bcrypt.compare(
+    refreshToken,
+    storedToken.tokenHash,
+  );
   if (!tokenMatches) {
     await prisma.refreshToken.deleteMany({ where: { userId: user.id } });
     throw new Error("Refresh token reuse detected. Please log in again.");
@@ -150,7 +153,10 @@ const refresh = async (refreshToken: string) => {
 
   await prisma.refreshToken.delete({ where: { id: storedToken.id } });
 
-  const newAccessToken = signAccessToken({ userId: user.id, email: user.email });
+  const newAccessToken = signAccessToken({
+    userId: user.id,
+    email: user.email,
+  });
   const newRefresh = signRefreshToken({ userId: user.id, email: user.email });
   await storeRefreshToken(user.id, newRefresh.jti, newRefresh.token);
 

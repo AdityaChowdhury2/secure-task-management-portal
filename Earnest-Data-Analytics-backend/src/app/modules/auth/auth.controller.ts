@@ -42,7 +42,9 @@ const login: RequestHandler = catchAsync(
 
 const refreshToken: RequestHandler = catchAsync(
   async (req: Request, res: Response) => {
-    const result = await AuthService.refreshTokenService(req.body.refreshToken);
+    const result = await AuthService.refreshTokenService(
+      req.cookies.refreshToken,
+    );
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
