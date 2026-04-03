@@ -185,7 +185,7 @@ router.post(
 router.post(
   "/logout",
   requireAuth,
-  validateRequest(logoutSchema),
+  // validateRequest(logoutSchema),
   AuthController.logout,
 );
 
