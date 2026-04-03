@@ -163,7 +163,7 @@ export const api = createApi({
     updateTask: builder.mutation<Task, UpdateTaskRequest>({
       query: ({ id, ...patch }) => ({
         url: `/tasks/${id}`,
-        method: "PUT",
+        method: "PATCH",
         body: patch,
       }),
       invalidatesTags: (_result, _err, arg) => [
