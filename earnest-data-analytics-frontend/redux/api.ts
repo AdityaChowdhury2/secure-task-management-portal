@@ -37,27 +37,44 @@ function normalizePaginatedTasksResponse(raw: unknown): PaginatedTasksResponse {
   if (Array.isArray(raw)) {
     return {
       items: raw.map(normalizeTask),
-      page: 1,
-      limit: raw.length || 10,
-      totalItems: raw.length,
-      totalPages: 1,
+      meta: {
+        page: 1,
+        limit: raw.length || 10,
+        totalItems: raw.length,
+        totalPages: 1,
+      },
     };
   }
 
   const rawObj = asRecord(raw);
   const data = asRecord(rawObj.data ?? rawObj);
+  /** Many APIs nest pagination under `meta` (e.g. `{ meta: { page, limit, total, totalPages }, items }`). */
+  const meta = asRecord(data.meta ?? {});
+
   const itemsRaw = data.items ?? data.tasks ?? data.docs ?? [];
   const items = Array.isArray(itemsRaw) ? itemsRaw.map(normalizeTask) : [];
-  const page = Number(data.page ?? data.currentPage ?? 1);
-  const limit = Number(data.limit ?? data.perPage ?? 10);
+
+  const page = Number(
+    meta.page ?? data.page ?? data.currentPage ?? 1,
+  );
+  const limit = Number(
+    meta.limit ?? data.limit ?? data.perPage ?? 10,
+  );
   const totalItems = Number(
-    data.totalItems ?? data.total ?? data.totalDocs ?? items.length,
+    meta.totalItems ??
+      meta.total ??
+      data.totalItems ??
+      data.total ??
+      data.totalDocs ??
+      items.length,
   );
   const totalPages = Number(
-    data.totalPages ?? Math.max(1, Math.ceil(totalItems / Math.max(1, limit))),
+    meta.totalPages ??
+      data.totalPages ??
+      Math.max(1, Math.ceil(totalItems / Math.max(1, limit))),
   );
 
-  return { items, page, limit, totalItems, totalPages };
+  return { items, meta: { page, limit, totalItems, totalPages } };
 }
 
 export const api = createApi({

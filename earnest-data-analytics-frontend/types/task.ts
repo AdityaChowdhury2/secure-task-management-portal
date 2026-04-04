@@ -16,12 +16,16 @@ export type GetTasksQueryParams = {
   search?: string;
 };
 
-export type PaginatedTasksResponse = {
-  items: Task[];
+type Meta = {
   page: number;
   limit: number;
   totalItems: number;
   totalPages: number;
+};
+
+export type PaginatedTasksResponse = {
+  items: Task[];
+  meta: Meta;
 };
 
 export type CreateTaskRequest = {

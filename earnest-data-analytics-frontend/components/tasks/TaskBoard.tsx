@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
 import {
   useCreateTaskMutation,
   useDeleteTaskMutation,
@@ -10,41 +11,24 @@ import {
 } from "@/redux/api";
 import type { ApiTaskStatus, Task, TaskStatusFilter } from "@/types/task";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
+import { RowActionsHelp } from "@/components/tasks/RowActionsHelp";
+import { TaskBoardTutorial } from "@/components/tasks/TaskBoardTutorial";
+import { TaskSegmentedPagination } from "@/components/tasks/TaskSegmentedPagination";
 import { TaskSkeletonGrid } from "@/components/tasks/TaskSkeleton";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, TextArea } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { toast } from "react-toastify";
-import { TaskCard } from "@/components/tasks/TaskCard";
+import { formatTaskDate } from "@/lib/format";
 
-const PAGE_SIZE = 50;
-
-const BOARD_COLUMNS = [
-  {
-    id: "PENDING" as ApiTaskStatus,
-    label: "To Do",
-    dot: "bg-rose-500",
-    headerGrad: "from-rose-500/10 to-orange-500/10",
-    border: "border-rose-200/50",
-  },
-  {
-    id: "IN_PROGRESS" as ApiTaskStatus,
-    label: "In Progress",
-    dot: "bg-blue-500",
-    headerGrad: "from-blue-500/10 to-indigo-500/10",
-    border: "border-blue-200/50",
-  },
-  {
-    id: "COMPLETED" as ApiTaskStatus,
-    label: "Done",
-    dot: "bg-emerald-500",
-    headerGrad: "from-emerald-500/10 to-teal-500/10",
-    border: "border-emerald-200/50",
-  },
-];
+type CreateTaskFormValues = {
+  title: string;
+  description: string;
+};
 
 export function TaskBoard() {
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 350);
   const [filter, setFilter] = useState<TaskStatusFilter>("all");
@@ -55,7 +39,7 @@ export function TaskBoard() {
     error,
   } = useGetTasksQuery({
     page,
-    limit: PAGE_SIZE,
+    limit: pageSize,
     status: filter === "all" ? undefined : filter,
     search: debouncedSearch,
   });
@@ -70,30 +54,36 @@ export function TaskBoard() {
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
   const [toggleBusyId, setToggleBusyId] = useState<string | null>(null);
 
+  const createForm = useForm<CreateTaskFormValues>({
+    defaultValues: { title: "", description: "" },
+  });
+  const {
+    register: registerCreate,
+    handleSubmit: handleCreateSubmit,
+    reset: resetCreateForm,
+    formState: { errors: createErrors },
+  } = createForm;
+
   const [formTitle, setFormTitle] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formStatus, setFormStatus] = useState<ApiTaskStatus>("PENDING");
 
-  // const [seeding, setSeeding] = useState(false);
-
   const tasks = useMemo(() => tasksData?.items ?? [], [tasksData?.items]);
+  const totalPages = tasksData?.meta?.totalPages ?? 1;
+  const totalItems = tasksData?.meta?.totalItems ?? 0;
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, filter]);
-
-  const tasksByStatus = useMemo(() => {
-    return tasks.reduce((acc, task) => {
-      acc[task.status] = acc[task.status] ? [...acc[task.status], task] : [task];
-      return acc;
-    }, {} as Record<ApiTaskStatus, Task[]>);
-  }, [tasks]);
+  }, [debouncedSearch, filter, pageSize]);
 
   function openAdd() {
-    setFormTitle("");
-    setFormDescription("");
-    setFormStatus("PENDING");
+    resetCreateForm({ title: "", description: "" });
     setAddOpen(true);
+  }
+
+  function closeAddModal() {
+    resetCreateForm({ title: "", description: "" });
+    setAddOpen(false);
   }
 
   function openEdit(task: Task) {
@@ -103,17 +93,14 @@ export function TaskBoard() {
     setEditTask(task);
   }
 
-  async function submitCreate() {
-    if (!formTitle.trim()) {
-      toast.error("Title is required");
-      return;
-    }
+  async function onCreateValid(values: CreateTaskFormValues) {
     try {
       await createTask({
-        title: formTitle.trim(),
-        description: formDescription.trim(),
+        title: values.title.trim(),
+        description: values.description.trim(),
       }).unwrap();
       toast.success("Task created");
+      resetCreateForm({ title: "", description: "" });
       setAddOpen(false);
     } catch {
       toast.error("Could not create task");
@@ -162,32 +149,6 @@ export function TaskBoard() {
     }
   }
 
-  // async function seedDummyTasks() {
-  //   setSeeding(true);
-  //   const dummyTasks = Array.from({ length: 20 }).map((_, i) => {
-  //     const statuses: ApiTaskStatus[] = ["PENDING", "IN_PROGRESS", "COMPLETED"];
-  //     return {
-  //       title: `Dashboard Redesign Feature pt.${i + 1}`,
-  //       description: `Implement the modern UI components for the redesigned task board module. Ensure everything is responsive, animated, and looks absolutely gorgeous for phase ${i + 1}.`,
-  //       status: statuses[Math.floor(Math.random() * statuses.length)],
-  //     };
-  //   });
-
-  //   try {
-  //     for (const t of dummyTasks) {
-  //       const res = await createTask({ title: t.title, description: t.description }).unwrap();
-  //       if (t.status !== "PENDING") {
-  //         await updateTask({ id: res.id, title: res.title, description: res.description, status: t.status }).unwrap();
-  //       }
-  //     }
-  //     toast.success("Successfully generated 20 dummy tasks!");
-  //   } catch {
-  //     toast.error("Failed to generate some dummy tasks.");
-  //   } finally {
-  //     setSeeding(false);
-  //   }
-  // }
-
   if (error) {
     return (
       <div className="rounded-2xl border border-red-100 bg-red-50 p-6 text-sm text-red-800 shadow-sm">
@@ -197,8 +158,8 @@ export function TaskBoard() {
   }
 
   return (
-    <div className="mx-auto max-w-350">
-      <div className="relative mb-10 overflow-hidden rounded-3xl bg-white p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
+    <div className="mx-auto flex flex-col w-full">
+      <div className="relative mb-8 overflow-hidden rounded-3xl bg-white p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
         <div className="absolute top-0 left-0 w-full h-2 bg-linear-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
         <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -206,11 +167,12 @@ export function TaskBoard() {
               Workspace
             </h1>
             <p className="text-slate-500 text-sm max-w-xl">
-              Organize your tasks visually. Add, move, and complete your tasks seamlessly via this modern board layout.
+              Organize your tasks efficiently. View, filter, and modify items using this modern paginated table layout.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Button
+              data-tutorial="new-task"
               className="rounded-xl shadow-lg hover:shadow-indigo-500/20 px-5 transition-all bg-slate-900 border-0"
               onClick={openAdd}
             >
@@ -221,23 +183,14 @@ export function TaskBoard() {
                 New Task
               </span>
             </Button>
-            {/* <Button
-              onClick={seedDummyTasks}
-              disabled={seeding}
-              className="rounded-xl border-0 bg-linear-to-r! from-indigo-500! via-purple-500! to-pink-500! hover:from-indigo-600! hover:to-pink-600! text-white shadow-lg hover:shadow-purple-500/30 px-5 transition-all"
-            >
-              <span className="flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                </svg>
-                {seeding ? "Generating..." : "Gen 20 Tasks"}
-              </span>
-            </Button> */}
           </div>
         </div>
 
-        <div className="relative z-10 mt-8 flex flex-col gap-4 sm:flex-row sm:items-end bg-slate-50/50 p-4 rounded-2xl border border-slate-100/50">
-          <div className="min-w-0 flex-1">
+        <div
+          data-tutorial="search-filter"
+          className="relative z-10 mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100/50 items-end"
+        >
+          <div className="min-w-0">
             <Label htmlFor="task-search" className="text-slate-500 mb-1.5 ml-1">Quick Search</Label>
             <Input
               id="task-search"
@@ -247,7 +200,7 @@ export function TaskBoard() {
               className="bg-white border-white/40 shadow-sm backdrop-blur-md"
             />
           </div>
-          <div className="w-full sm:w-64">
+          <div className="w-full">
             <Label htmlFor="task-status-filter" className="text-slate-500 mb-1.5 ml-1">Filter View</Label>
             <select
               id="task-status-filter"
@@ -265,7 +218,7 @@ export function TaskBoard() {
       </div>
 
       {isLoading ? (
-        <TaskSkeletonGrid />
+        <TaskSkeletonGrid count={pageSize} />
       ) : (
         <>
           {tasks.length === 0 ? (
@@ -277,48 +230,133 @@ export function TaskBoard() {
               </div>
               <h3 className="text-lg font-semibold text-slate-800 mb-1">No tasks found</h3>
               <p className="text-sm text-slate-500 max-w-xs mx-auto">
-                No tasks match your current criteria. Create a new task or generate dummy data to get started.
+                No tasks match your current criteria. Create a new task to get started.
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-start pb-8">
-              {BOARD_COLUMNS.map((col) => {
-                if (filter !== "all" && filter !== col.id) return null;
-                const colTasks = tasksByStatus[col.id] || [];
-                return (
-                  <div key={col.id} className="flex flex-col rounded-3xl bg-slate-50/60 backdrop-blur-3xl border border-slate-200/60 p-2 shadow-sm min-h-125">
-                    <div className={`rounded-2xl bg-linear-to-br ${col.headerGrad} p-4 mb-3 border border-white/50 backdrop-blur-md`}>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className={`w-2.5 h-2.5 rounded-full ${col.dot} shadow-sm`} />
-                          <h2 className="font-semibold text-slate-800">{col.label}</h2>
-                        </div>
-                        <span className="text-xs font-bold text-slate-500 bg-white/60 px-2 py-0.5 rounded-full border border-slate-200/50">
-                          {colTasks.length}
+            <div className="bg-slate-50/60 backdrop-blur-3xl border border-slate-200/60 rounded-3xl shadow-sm overflow-hidden mb-8">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm whitespace-nowrap">
+                  <thead className="bg-white/50 text-slate-500 uppercase tracking-wider text-[11px] font-semibold border-b border-slate-200/60">
+                    <tr>
+                      <th scope="col" className="px-6 py-4">Status</th>
+                      <th scope="col" className="px-6 py-4">Title</th>
+                      <th scope="col" className="px-6 py-4 hidden md:table-cell">Description</th>
+                      <th scope="col" className="px-6 py-4">Created Date</th>
+                      <th
+                        scope="col"
+                        data-tutorial="row-actions"
+                        className="px-6 py-4 text-right"
+                      >
+                        <span className="inline-flex items-center justify-end gap-1.5">
+                          <span>Actions</span>
+                          <RowActionsHelp />
                         </span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-3 px-1.5 pb-2">
-                      {colTasks.length > 0 ? (
-                        colTasks.map((task) => (
-                          <TaskCard
-                            key={task.id}
-                            task={task}
-                            onEdit={openEdit}
-                            onDelete={setDeleteTarget}
-                            onToggle={handleToggle}
-                            toggling={toggleBusyId === task.id}
-                          />
-                        ))
-                      ) : (
-                        <div className="flex items-center justify-center h-24 border-2 border-dashed border-slate-200/80 rounded-2xl bg-slate-50/50">
-                          <p className="text-sm text-slate-400 font-medium">Drop tasks here</p>
-                        </div>
-                      )}
-                    </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100/60">
+                    {tasks.map((task) => {
+                      const isDone = task.status === "COMPLETED";
+                      const isInProgress = task.status === "IN_PROGRESS";
+                      return (
+                        <tr key={task.id} className="hover:bg-white/60 bg-white/40 transition-colors duration-200 group">
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border
+                              ${isDone ? "bg-emerald-50 text-emerald-700 border-emerald-200/60" :
+                                isInProgress ? "bg-blue-50 text-blue-700 border-blue-200/60" :
+                                  "bg-rose-50 text-rose-700 border-rose-200/60"}
+                            `}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${isDone ? "bg-emerald-500" : isInProgress ? "bg-blue-500" : "bg-rose-500"}`}></span>
+                              {task.status.replace("_", " ")}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <p className={`font-semibold text-[14px] truncate max-w-[200px] ${isDone ? "text-slate-400 line-through" : "text-slate-800"}`}>
+                              {task.title}
+                            </p>
+                          </td>
+                          <td className="px-6 py-4 hidden md:table-cell">
+                            <p className="text-slate-500 truncate max-w-[250px] lg:max-w-[400px]">
+                              {task.description || "—"}
+                            </p>
+                          </td>
+                          <td className="px-6 py-4 text-slate-500">
+                            {formatTaskDate(task.createdAt)}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => handleToggle(task.id)}
+                                disabled={toggleBusyId === task.id}
+                                className={`p-1.5 rounded-md hover:bg-slate-100 transition-colors ${isDone ? "text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50" : "text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"}`}
+                                title={isDone ? "Mark Pending" : "Mark Done"}
+                              >
+                                {isDone ? (
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                ) : (
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </button>
+                              <button
+                                onClick={() => openEdit(task)}
+                                className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-md hover:bg-indigo-50 transition-colors"
+                                title="Edit Task"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => setDeleteTarget(task)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 rounded-md hover:bg-rose-50 transition-colors"
+                                title="Delete Task"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Footer */}
+              <div className="flex flex-col sm:flex-row gap-4 items-center justify-between border-t border-slate-200/60 bg-white/60 px-6 py-4">
+                <div className="text-sm text-slate-500">
+                  Showing page <span className="font-semibold text-slate-700">{page}</span> of <span className="font-semibold text-slate-700">{totalPages}</span>
+                  {" "}({totalItems} total tasks)
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-slate-500">Items per page:</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => setPageSize(Number(e.target.value))}
+                      className="cursor-pointer rounded-lg border border-slate-200/60 bg-white px-2 py-1 text-sm text-slate-700 shadow-sm outline-none transition hover:border-slate-300 focus:border-indigo-400"
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={15}>15</option>
+                    </select>
                   </div>
-                );
-              })}
+                  <div className="max-w-full overflow-x-auto">
+                    <TaskSegmentedPagination
+                      page={page}
+                      totalPages={Math.max(1, totalPages)}
+                      onPageChange={setPage}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </>
@@ -328,40 +366,62 @@ export function TaskBoard() {
       <Modal
         open={addOpen}
         title="Create New Task"
-        onClose={() => setAddOpen(false)}
+        onClose={closeAddModal}
         footer={
           <div className="flex gap-3 w-full sm:w-auto">
-            <Button variant="secondary" className="flex-1 sm:flex-none" onClick={() => setAddOpen(false)}>
+            <Button variant="secondary" type="button" className="flex-1 sm:flex-none" onClick={closeAddModal}>
               Discard
             </Button>
-            <Button className="flex-1 sm:flex-none bg-slate-900 border-none px-6" onClick={submitCreate} disabled={creating}>
+            <Button
+              type="submit"
+              form="create-task-form"
+              className="flex-1 sm:flex-none bg-slate-900 border-none px-6"
+              disabled={creating}
+            >
               {creating ? "Creating..." : "Create Task"}
             </Button>
           </div>
         }
       >
-        <div className="space-y-5 pt-2">
+        <form
+          id="create-task-form"
+          className="space-y-5 pt-2"
+          onSubmit={handleCreateSubmit(onCreateValid)}
+          noValidate
+        >
           <div>
-            <Label htmlFor="add-title" className="text-slate-600">Task Title</Label>
+            <Label htmlFor="add-title" className="text-slate-600">
+              Task Title
+            </Label>
             <Input
               id="add-title"
               placeholder="e.g., Update marketing copy"
-              value={formTitle}
-              onChange={(e) => setFormTitle(e.target.value)}
-              className="mt-1.5"
+              className={`mt-1.5 ${createErrors.title ? "border-red-300 focus:border-red-400 focus:ring-red-100" : ""}`}
+              aria-invalid={createErrors.title ? true : undefined}
+              aria-describedby={createErrors.title ? "add-title-error" : undefined}
+              {...registerCreate("title", {
+                required: "Title is required",
+                validate: (v) => (v?.trim() ? true : "Title is required"),
+              })}
             />
+            {createErrors.title && (
+              <p id="add-title-error" className="mt-1.5 text-xs text-red-600" role="alert">
+                {createErrors.title.message}
+              </p>
+            )}
           </div>
           <div>
-            <Label htmlFor="add-desc" className="text-slate-600">Details (Optional)</Label>
+            <Label htmlFor="add-desc" className="text-slate-600">
+              Details (Optional)
+            </Label>
             <TextArea
               id="add-desc"
               placeholder="Provide a little more context..."
-              value={formDescription}
-              onChange={(e) => setFormDescription(e.target.value)}
               className="mt-1.5 h-28"
+              {...registerCreate("description")}
             />
           </div>
-        </div>
+        </form>
       </Modal>
 
       <Modal
@@ -444,6 +504,8 @@ export function TaskBoard() {
           This action cannot be undone.
         </p>
       </Modal>
+
+      <TaskBoardTutorial />
     </div>
   );
 }

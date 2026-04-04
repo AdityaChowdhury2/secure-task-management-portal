@@ -29,8 +29,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[#f9fafb] md:flex-row">
-      <aside className="hidden w-56 shrink-0 flex-col border-r border-slate-200/80 bg-white shadow-sm md:flex">
+    <div className="flex h-dvh max-h-dvh flex-col overflow-hidden bg-[#f9fafb] md:flex-row">
+      <aside className="hidden h-full w-56 shrink-0 flex-col overflow-hidden border-r border-slate-200/80 bg-white shadow-sm md:flex">
         <div className="border-b border-slate-100 px-4 py-5">
           <span className="text-sm font-semibold tracking-tight text-slate-900">
             Earnest
@@ -56,8 +56,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </nav>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col pb-20 md:pb-0">
-        <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-slate-200/80 bg-white/90 px-4 py-3 shadow-sm backdrop-blur-md md:px-6">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="z-20 flex shrink-0 items-center justify-between gap-3 border-b border-slate-200/80 bg-white/90 px-4 py-3 shadow-sm backdrop-blur-md md:px-6">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-slate-900 md:hidden">
               Earnest
@@ -82,7 +82,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-x-hidden px-4 py-5 md:px-8 md:py-8">
+        <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-5 pb-20 md:px-8 md:py-8">
           {children}
         </main>
       </div>
