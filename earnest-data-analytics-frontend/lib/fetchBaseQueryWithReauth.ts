@@ -34,7 +34,7 @@ async function refreshAccessToken(api: BaseQueryApi): Promise<string | null> {
           headers: { "Content-Type": "application/json" },
         });
         if (!res.ok) return null;
-        const data = (await res.json()) as AuthResponse;
+        const { data } = (await res.json()) as AuthResponse;
         if (data.accessToken) {
           api.dispatch(
             setCredentials({
