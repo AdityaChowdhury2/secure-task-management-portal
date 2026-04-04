@@ -17,14 +17,6 @@ const auth_service_1 = require("./auth.service");
 const sendResponse_1 = __importDefault(require("../../utils/sendResponse"));
 const http_status_1 = __importDefault(require("http-status"));
 const catchAsync_1 = require("../../utils/catchAsync");
-const refreshCookieName = "refreshToken";
-const refreshCookieOptions = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: (process.env.NODE_ENV === "production" ? "none" : "strict"),
-    maxAge: 1000 * 60 * 60 * 24 * 7,
-    path: "/",
-};
 const register = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const result = yield auth_service_1.AuthService.registerService(req.body);
     (0, sendResponse_1.default)(res, {
@@ -39,54 +31,40 @@ const login = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 0, void 
         statusCode: http_status_1.default.OK,
         success: true,
         message: "User logged in successfully",
-        data: {
-            accessToken: result.accessToken,
-            user: result.user,
-        },
+        data: result,
         cookies: [
             {
-                name: refreshCookieName,
+                name: "refreshToken",
                 value: result.refreshToken,
-                options: refreshCookieOptions,
+                options: {
+                    httpOnly: process.env.NODE_ENV === "production",
+                    sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+                    secure: process.env.NODE_ENV === "production",
+                    maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
+                },
             },
         ],
     });
 }));
 const refreshToken = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const rawRefreshToken = (_a = req.cookies) === null || _a === void 0 ? void 0 : _a.refreshToken;
-    const result = yield auth_service_1.AuthService.refreshTokenService(rawRefreshToken);
+    const result = yield auth_service_1.AuthService.refreshTokenService(req.cookies.refreshToken);
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,
         success: true,
-        message: "Token refreshed successfully",
-        data: { accessToken: result.accessToken },
-        cookies: [
-            {
-                name: refreshCookieName,
-                value: result.refreshToken,
-                options: refreshCookieOptions,
-            },
-        ],
+        message: "Refresh token generated successfully",
+        data: result,
     });
 }));
 const logout = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
-    const user = req.user;
-    if (!user) {
-        (0, sendResponse_1.default)(res, {
-            statusCode: http_status_1.default.UNAUTHORIZED,
-            success: false,
-            message: "Unauthorized.",
-        });
-        return;
-    }
-    yield auth_service_1.AuthService.logoutService({
-        userId: user.userId,
-        refreshToken: (_a = req.cookies) === null || _a === void 0 ? void 0 : _a.refreshToken,
-        allSessions: Boolean((_b = req.body) === null || _b === void 0 ? void 0 : _b.allSessions),
+    // const accessToken = req?.cookies?.accessToken;
+    // await AuthService.logoutService(accessToken);
+    res.clearCookie("refreshToken", {
+        httpOnly: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 0,
+        path: "/",
     });
-    res.clearCookie(refreshCookieName, refreshCookieOptions);
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,
         success: true,

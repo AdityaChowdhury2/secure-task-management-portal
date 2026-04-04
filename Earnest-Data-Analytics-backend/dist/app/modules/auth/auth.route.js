@@ -3,9 +3,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthRoutes = void 0;
 const express_1 = require("express");
 const auth_controller_1 = require("./auth.controller");
-const assignmentAuth_1 = require("../../middlewares/assignmentAuth");
 const validateRequest_1 = require("../../middlewares/validateRequest");
 const auth_validation_1 = require("./auth.validation");
+const assignmentAuth_1 = require("../../middlewares/assignmentAuth");
 const router = (0, express_1.Router)();
 /**
  * @openapi
@@ -170,5 +170,7 @@ const router = (0, express_1.Router)();
 router.post("/register", (0, validateRequest_1.validateRequest)(auth_validation_1.registerSchema), auth_controller_1.AuthController.register);
 router.post("/login", (0, validateRequest_1.validateRequest)(auth_validation_1.loginSchema), auth_controller_1.AuthController.login);
 router.post("/refresh", (0, validateRequest_1.validateRequest)(auth_validation_1.refreshSchema), auth_controller_1.AuthController.refreshToken);
-router.post("/logout", assignmentAuth_1.requireAuth, (0, validateRequest_1.validateRequest)(auth_validation_1.logoutSchema), auth_controller_1.AuthController.logout);
+router.post("/logout", assignmentAuth_1.requireAuth, 
+// validateRequest(logoutSchema),
+auth_controller_1.AuthController.logout);
 exports.AuthRoutes = router;

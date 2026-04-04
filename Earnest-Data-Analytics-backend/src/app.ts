@@ -11,7 +11,10 @@ const app: Application = express();
 
 app.use(
   cors({
-    origin: "http://localhost:3000", // ❗ NOT '*'
+    origin: [
+      "http://localhost:3000",
+      "https://secure-task-management-portal-aditya.vercel.app",
+    ], // ❗ NOT '*'
     credentials: true, // required
   }),
 );

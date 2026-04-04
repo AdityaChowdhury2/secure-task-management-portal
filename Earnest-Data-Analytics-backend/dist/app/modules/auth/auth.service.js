@@ -122,7 +122,10 @@ const refresh = (refreshToken) => __awaiter(void 0, void 0, void 0, function* ()
         throw new Error("Refresh token reuse detected. Please log in again.");
     }
     yield prisma_1.default.refreshToken.delete({ where: { id: storedToken.id } });
-    const newAccessToken = signAccessToken({ userId: user.id, email: user.email });
+    const newAccessToken = signAccessToken({
+        userId: user.id,
+        email: user.email,
+    });
     const newRefresh = signRefreshToken({ userId: user.id, email: user.email });
     yield storeRefreshToken(user.id, newRefresh.jti, newRefresh.token);
     return { accessToken: newAccessToken, refreshToken: newRefresh.token };
